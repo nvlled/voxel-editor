@@ -247,15 +247,6 @@ namespace HelloWorld
 		public Vector3 size;
 	}
 
-	/*
-	class VoxelCubeSideTexture
-	{
-		public byte atlasID;
-		public ushort i;
-		public ushort j;
-	}
-	*/
-
 	class VoxelCubeSideItem
 	{
 		//public string tileName;
@@ -311,6 +302,8 @@ namespace HelloWorld
 	// or optimizations. Or at most, I would use spatial hash.
 	class VoxelWorld
 	{
+		int renderDistance = 50;
+
 		public AtlasManager atlasManager;
 
 		public VoxelCube[] data;
@@ -363,92 +356,6 @@ namespace HelloWorld
 			return pos + minBounds;
 		}
 
-		// !!!!!!!!!!
-		// TODO: render only blocks that are in the direction of the camera
-		// TODO: it's slow as fuck
-		// 100x100x100 is actually pretty big already
-		// but still iterating the whole world per frame is a big nope
-		// !!!!!!!!!!
-		// !!!!!!!!!!
-
-		float temp = 0;
-		(float, float) temp2 = (0, 0);
-
-		// Hmmm, I guess this works? At least it remains
-		// constant even if I make the world bigger.
-		// is 2000 iteration per frame a lot?
-		// actually, even a million loop per frame
-		// seems to do just fine
-		// yeah, this will do just fine
-		// as long as it's not several billions per frame
-
-		// Okay, there's one little problem.
-		// Since the cubes are aligned, some
-		// cubes won't get rendered at certain awkward angles
-		// solution 0: cast the wall on the xz, xy, zy plane
-		// solution 1: instead of a wall, cast a cube or sphere
-		// solution 2: instead of using round, using both floor and ceil
-		// solution 3: read about frustrum
-		// #2 is probably more efficient, but no guarantees it will work
-		// #1 excessive
-		// #3, I could look at the camera code and how the frustrum
-		// is computed. This is probably the sanest solution.
-		// nope, #2 doesn't work
-		// After having been haunted in my sleep, I
-		// realized that none of this will work.
-		// #0 still will miss a lot of cubes on certain (diagonal) angles
-		// #3 frustrum and cone are about the same thing anyway
-		// solution 4: do ray tracing, but with cubes instead of the pixels
-		// With #4, I think I can even do a render distance of more than a hundred
-		// and still perform well. Maybe? I at least I could stop
-		// skip the ray once it hits an opaque cube, but it's not
-		// that simple at oblique camera views.
-		// 
-		// 5x5=25 rays, and 100 render distance
-		// 2500 iterations at most
-		// or 49 rays, and 100 render distance
-		// 4900
-		// yeah this will work
-		// *******33333**************
-		// *******32223**************
-		// *******32123**************
-		// *******32223**************
-		// *******33333**************
-
-		// As an added possible optimization,
-		// render the distant cubes every other frame?
-		// Or not, that will probably make it blink
-
-		// TODO:
-		// hmm, it seems FPS drops a lot when I get close to a texture
-		// it's definitely not a problem in the number of iterations
-		// since it still lags even I just draw a single cube
-		// My guess is that this has to do with copying the Texture2D around
-		// Nope, it's not it
-		// There's probably something that should not be computed
-		// per frame, such as:
-		// - IEnumerable
-		// - quaternion
-		// Aha, by process of elimination, I found the problem, maybe.
-		// It seems calling DrawTiles too many times is the source.
-		// I copied the code from DrawBillboard, which I imagine
-		// doesn't perform well at scale. Looking closer,
-		// I think the problem is one of these:
-		/*
-			gl.rlCheckRenderBatchLimit(4);
-			gl.rlSetTexture(texture.id);
-			gl.rlBegin(DrawMode.QUADS);
-		*/
-		// It appears that rl.DrawCube suffers from the same problem.
-		// On the plus side, the ray casting works.
-
-		// Okay... It can maintain 60 fps at a relatively big world.
-		// It bothers me that it does 100k loops per frame,
-		// but it seems to be fine it that 100k loop does nothing for the most part.
-		// I can tweak it all month long to make it faster, but
-		// I leave it for now. It's good enough, and I've got
-		// more things to do.
-
 		// TODO: commit, then cleanup, then commit again
 		// TODO: show tile coordinates, and distance from origin
 		// TODO: do not draw outside world boundary
@@ -469,19 +376,15 @@ namespace HelloWorld
 			var xStep = Vector3.Normalize(right - left);
 			var yStep = Vector3.Normalize(up - down);
 
-			var renderDistance = 50;
-			var v = ray.direction * renderDistance;
+			var farSide = ray.direction * renderDistance;
 			var fovX = cam.GetFOVX();
 			var fovY = cam.Camera.fovy;
 			var fov = MathF.Max(fovX, fovY);
 
 			//var m = v * rm.MatrixRotate(up, fovX);
-			var v2 = rm.Vector3RotateByQuaternion(ray.direction, rm.QuaternionFromAxisAngle(up, fovY));
-			var v3 = rm.Vector3RotateByQuaternion(ray.direction, rm.QuaternionFromAxisAngle(ray.direction, fovY));
-
-			var radius = MathF.Ceiling(MathF.Abs((v3 - v).Length())) * 0.6f;
-			var radiusY = radius;
-			var radiusX = radius;
+			var v2 = rm.Vector3RotateByQuaternion(ray.direction, rm.QuaternionFromAxisAngle(up, fov));
+			//var v3 = rm.Vector3RotateByQuaternion(ray.direction, rm.QuaternionFromAxisAngle(ray.direction, fovY));
+			var radius = MathF.Ceiling(MathF.Abs((v2 - farSide).Length())) * 0.6f;
 
 
 			iterations = 0;
@@ -496,10 +399,8 @@ namespace HelloWorld
 					var q = ray.position + u * d;
 					var found = DrawCube(Voxel.AlignPosition(q));
 					if (found) { break; }
+
 					iterations++;
-					//foreach (var cubePos in Voxel.AlignPositions(q))
-					{
-					}
 				}
 			}
 
@@ -524,100 +425,6 @@ namespace HelloWorld
 				inc += 0.01f;
 			}
 		}
-		// 1, 0
-		// 1, 1
-		// 0, 1
-		// -1, 0
-		// 1, -1
-		// 0, -1
-		// -1,-1
-
-		// **************************************************************
-		// *******************2******************************************
-		// ********************1*****************************************
-		// *********************0****************************************
-		// **************************************************************
-		// **************************************************************
-
-
-
-		/*
-				public void Draw(Ray ray, Vector3 camUp)
-				{
-					var right = Vector3.Cross(ray.direction, camUp);
-					var left = Vector3.Negate(right);
-					var up = Vector3.Cross(ray.direction, right);
-					var down = Vector3.Negate(up);
-
-					var xStep = Vector3.Normalize(right - left);
-					var yStep = Vector3.Normalize(up - down);
-
-					//var left = Vector3.Cross(ray.direction, up);
-					//var down = Vector3.Negate(up);
-					//var right = Vector3.Negate(left);
-
-					var maxRadius = 1;
-					var renderDistance = 30;
-
-
-					//var dirs = new Vector3[] { ray.direction, ray.direction + down, ray.direction + up, ray.direction + left, ray.direction + right };
-
-
-					var numDraws = 0;
-					var steps = 0;
-					var pos = ray.position + ray.direction;
-					while (steps++ < renderDistance)
-					{
-						// FIX: radius should be exponential so the cone would cover the screen size
-						var radius = steps + maxRadius;
-						for (var a = -radius; a <= radius; a++)
-						{
-							for (var b = -radius; b <= radius; b++)
-							{
-								foreach (var cubePos in Voxel.AlignPositions(pos + xStep * a + yStep * b))
-								{
-
-									//var cubePos = Voxel.AlignPosition(pos + xStep * a + yStep * b);
-									var index = toIndex(cubePos); // TODO: put index on cube itself
-									if (renderCache.Contains(index))
-									{
-										continue;
-									}
-									numDraws++;
-
-									renderCache.Add(index);
-									var cube = data[index];
-									// TODO: use index to avoid  redundant redrawing
-									if (cube != null)
-									{
-										var p = fromIndex(index);
-										DrawCube(cubePos, cube);
-									}
-									if ((int)temp == steps)
-									{
-										//Voxel.DrawCubeWires(cubePos, Color.GREEN);
-									}
-								}
-
-
-
-							}
-						}
-						pos += ray.direction * 0.60f;
-						//pos = Voxel.AlignPosition(pos);
-
-						if (temp > renderDistance)
-						{
-							temp = 0;
-						}
-						temp += rl.GetFrameTime() * 0.10f;
-					}
-
-					renderCache.Clear();
-					//Console.WriteLine(numDraws);
-
-				}
-				*/
 
 		public bool DrawCube(Vector3 position)
 		{
@@ -800,10 +607,6 @@ namespace HelloWorld
 					break;
 			}
 
-			//var source = subTexture.region;
-			//var texture = subTexture.texture;
-
-			// NOTE: Billboard size will maintain source rectangle aspect ratio, size will represent billboard width
 			var size = sizeArg ?? Vector2.One;
 			var sizeRatio = new Vector2(size.Y, size.X * (float)source.height / source.width);
 			var origin = originArg.GetValueOrDefault(Vector2.Zero);
@@ -856,79 +659,13 @@ namespace HelloWorld
 
 	static class Program
 	{
-		static void DrawTile(Camera3D camera, Texture2D texture, Rectangle source, Vector3 position, Vector3 up, Vector3 right, Vector2 size, Vector2? originArg = null, float rotation = 0, Color? colorArg = null)
-		{
-			// NOTE: Billboard size will maintain source rectangle aspect ratio, size will represent billboard width
-			var sizeRatio = new Vector2(size.Y, size.X * (float)source.height / source.width);
-			var origin = originArg.GetValueOrDefault(Vector2.Zero);
-
-			//var matView = rm.MatrixLookAt(camera.position, camera.target, camera.up);
-
-			// 11 12 13 14
-			// 21 22 23 24
-			// 31 32 33 34
-			// 41 42 43 44
-			//var right = new Vector3(matView.M11, matView.M21, matView.M31);
-			//var up = { matView.m1, matView.m5, matView.m9 };
-
-			var rightScaled = rm.Vector3Scale(right, sizeRatio.X / 2);
-			var upScaled = rm.Vector3Scale(up, sizeRatio.Y / 2);
-
-			var p1 = rm.Vector3Add(rightScaled, upScaled);
-			var p2 = rm.Vector3Subtract(rightScaled, upScaled);
-
-			var topLeft = rm.Vector3Scale(p2, -1);
-			var topRight = p1;
-			var bottomRight = p2;
-			var bottomLeft = rm.Vector3Scale(p1, -1);
-
-
-			// Translate points to the draw center (position)
-			topLeft = rm.Vector3Add(topLeft, position);
-			topRight = rm.Vector3Add(topRight, position);
-			bottomRight = rm.Vector3Add(bottomRight, position);
-			bottomLeft = rm.Vector3Add(bottomLeft, position);
-			var color = colorArg.GetValueOrDefault(Color.WHITE);
-
-			gl.rlCheckRenderBatchLimit(4);
-			gl.rlSetTexture(texture.id);
-
-			gl.rlBegin(DrawMode.QUADS);
-			gl.rlColor4ub(color.r, color.g, color.b, color.a);
-
-			// Bottom-left corner for texture and quad
-			gl.rlTexCoord2f((float)source.x / texture.width, (float)source.y / texture.height);
-			gl.rlVertex3f(topLeft.X, topLeft.Y, topLeft.Z);
-
-			// Top-left corner for texture and quad
-			gl.rlTexCoord2f((float)source.x / texture.width, (float)(source.y + source.height) / texture.height);
-			gl.rlVertex3f(bottomLeft.X, bottomLeft.Y, bottomLeft.Z);
-
-			// Top-right corner for texture and quad
-			gl.rlTexCoord2f((float)(source.x + source.width) / texture.width, (float)(source.y + source.height) / texture.height);
-			gl.rlVertex3f(bottomRight.X, bottomRight.Y, bottomRight.Z);
-
-			// Bottom-right corner for texture and quad
-			gl.rlTexCoord2f((float)(source.x + source.width) / texture.width, (float)source.y / texture.height);
-			gl.rlVertex3f(topRight.X, topRight.Y, topRight.Z);
-			gl.rlEnd();
-
-			gl.rlSetTexture(0);
-		}
-
 		public unsafe static int Main()
 		{
 			var (sw, sh) = (1000, 800);
-			rl.InitWindow(sw, sh, "aa");
+			rl.InitWindow(sw, sh, "Voxel editor");
 			rl.SetWindowPosition(rl.GetMonitorWidth(0) - sw - 50, rl.GetMonitorHeight(0) - sh - 50);
 
-			var cam = new Camera3D(
-			//position: new Vector3(0, 1.5f, 0),
-			//target: new Vector3(-0.5f, 0, -0.5f),
-			//up: new Vector3(0, 1, 0),
-			//40,
-			//CameraProjection.CAMERA_PERSPECTIVE
-			);
+			var cam = new Camera3D();
 
 			cam.Setup(50, new Vector3(0, 1.5f, 0));
 			rl.DisableCursor();
@@ -940,7 +677,6 @@ namespace HelloWorld
 
 			var atlas = new Atlas(1, rl.LoadTexture("assets/atlas.png"), 32);
 
-			//rl.SetCameraMode(cam, CameraMode.CAMERA_CUSTOM);
 			rl.SetTargetFPS(60);
 
 
@@ -959,7 +695,6 @@ namespace HelloWorld
 				if (rl.IsMouseButtonPressed(MouseButton.MOUSE_LEFT_BUTTON))
 				{
 					var pos = Voxel.AlignPosition(camRay.position + camRay.direction * 1.5f);
-					//cubes1.Add();
 					world.InsertCube(pos, "brick");
 				}
 
@@ -967,7 +702,6 @@ namespace HelloWorld
 				{
 					if (rl.IsKeyDown(KeyboardKey.KEY_LEFT_SHIFT))
 					{
-						//cam.position.Y += -0.5f;
 					}
 					else
 					{
@@ -979,7 +713,6 @@ namespace HelloWorld
 				else
 				{
 					cam.Update();
-					//rl.UpdateCamera(&cam);
 				}
 
 
@@ -1000,7 +733,6 @@ namespace HelloWorld
 
 				rl.BeginDrawing();
 				rl.ClearBackground(Color.WHITE);
-				//rl.DrawText(string.Format("x={0} y={1} z={2}", (int)cam.position.X, (int)cam.position.Y, (int)cam.position.Z), 10, 10, 15, Color.BLACK);
 
 				cam.BeginMode3D();
 
@@ -1012,75 +744,20 @@ namespace HelloWorld
 				var up = new Vector3(0, 1, 0);
 				var size = new Vector2(1, 1);
 
-				/*
-				foreach (var c in cubes1)
-				{
-					var region = atlas.GetRect(2, 8);
-					var subTex = new SubTexture2D(atlas.texture, region);
-					Voxel.DrawTile(subTexture: subTex, cubePos: c, side: CubeSideType.FRONT);
-					Voxel.DrawTile(subTexture: subTex, cubePos: c, side: CubeSideType.RIGHT);
-					Voxel.DrawTile(subTexture: subTex, cubePos: c, side: CubeSideType.LEFT);
-					Voxel.DrawTile(subTexture: subTex, cubePos: c, side: CubeSideType.BACK);
-					Voxel.DrawTile(subTexture: subTex, cubePos: c, side: CubeSideType.TOP);
-					Voxel.DrawTile(subTexture: subTex, cubePos: c, side: CubeSideType.BOTTOM);
-				}
-				*/
-
-				/*
-								world.drawFlag = (byte)(world.drawFlag == 1 ? 2 : 1);
-								var huh = 0;
-								foreach (var g in world.fooblah(4))
-								{
-									//Voxel.DrawCube(new Vector3(-2, -2, -2), Color.RED);
-									world.DrawCube(new Vector3(1, 0, 0));
-									huh++;
-								}
-								Console.WriteLine("huh {0}", huh);
-								*/
-
-				//world.Draw(camRay, cam.Camera.up);
 				Voxel.DrawCubeWires(Voxel.AlignPosition(camRay.position + camRay.direction * 1.5f), Color.RED);
 				world.Draw(camRay, cam);
 
-				//Voxel.DrawTile(Vector3.Zero, ref world.texture, ref world.region, side: CubeSideType.FRONT);
-				//Voxel.DrawTile(Vector3.Zero, ref world.texture, ref world.region, side: CubeSideType.BACK);
-				//Voxel.DrawTile(Vector3.Zero, ref world.texture, ref world.region, side: CubeSideType.TOP);
-				//Voxel.DrawTile(Vector3.Zero, ref world.texture, ref world.region, side: CubeSideType.LEFT);
-				//Voxel.DrawTile(Vector3.Zero, ref world.texture, ref world.region, side: CubeSideType.RIGHT);
-
-
-
-
-				//Voxel.DrawCube(Vector3.Zero, new Color(0, 255, 255, 180));
-
-
-
-
-				//gl.rlPushMatrix();
-				//gl.rlTranslatef(-5, 0, 0);
-				//rl.DrawCube(new Vector3(0, 0, 0), 1, 1, 1, Color.BROWN);
-				//gl.rlPopMatrix();
-
-				//rl.DrawCircle(rl.GetScreenWidth() / 2, rl.GetScreenHeight() / 2, 5, Color.BLACK);
-				//rl.DrawCircle(rl.GetScreenWidth() / 2, rl.GetScreenHeight() / 2, 3, Color.RED);
 				Debug.DrawOrigin();
-				//rl.DrawText(Vector3.Normalize(ray.position).ToString(), 50, 50, 20, Color.BLACK);
-				//rl.DrawText(Vector3.Normalize(ray.direction).ToString(), 50, 80, 20, Color.BLACK);
-				//rl.DrawText(Vector3.Normalize(cam.target).ToString(), 50, 100, 20, Color.BLUE);
 
 				rl.EndShaderMode();
 
 				cam.EndMode3D();
-				//rl.EndMode3D();
 				rl.DrawFPS(rl.GetScreenWidth() - 100, 10);
 				rl.DrawText(string.Format("iter={0}", world.iterations), 10, 500, 22, Color.RED);
 
 
-				//rl.DrawTexture(atlas.texture, 50, 50, Color.WHITE);
 
-				// crosshair
-				//rl.DrawText(string.Format("cam ray {0}", camRay.direction), 20, 20, 30, Color.BLUE);
-				//rl.DrawFPS(20, 120);
+
 				rl.EndDrawing();
 			}
 
