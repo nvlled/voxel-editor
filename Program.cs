@@ -11,8 +11,10 @@ using System;
 using System.Linq;
 
 
+
 namespace HelloWorld
 {
+
 	public record class SubTexture2D(Texture2D texture, Rectangle region);
 
 
@@ -219,14 +221,16 @@ namespace HelloWorld
 				cubeDir = 1;
 			}
 
-			RaylibExt.WithMatrix(() =>
-			{
-				gl.rlRotatef(90, 1, 0, 0);
-				gl.rlTranslatef(0, 0.0f, -1.0f);
-				RaylibExt.DrawText3D(rl.GetFontDefault(), "X", new Vector3(3, 0, 0), 24, 1, 1, true, xColor);
-				RaylibExt.DrawText3D(rl.GetFontDefault(), "Y", new Vector3(0, 0, -3), 24, 1, 1, true, yColor);
-				RaylibExt.DrawText3D(rl.GetFontDefault(), "Z", new Vector3(0, 3, 0), 24, 1, 1, true, zColor);
-			});
+			/*
+						RaylibExt.WithMatrix(() =>
+						{
+							gl.rlRotatef(90, 1, 0, 0);
+							gl.rlTranslatef(0, 0.0f, -1.0f);
+							RaylibExt.DrawText3D(rl.GetFontDefault(), "X", new Vector3(3, 0, 0), 24, 1, 1, true, xColor);
+							RaylibExt.DrawText3D(rl.GetFontDefault(), "Y", new Vector3(0, 0, -3), 24, 1, 1, true, yColor);
+							RaylibExt.DrawText3D(rl.GetFontDefault(), "Z", new Vector3(0, 3, 0), 24, 1, 1, true, zColor);
+						});
+						*/
 
 		}
 	}
@@ -302,7 +306,7 @@ namespace HelloWorld
 	// or optimizations. Or at most, I would use spatial hash.
 	class VoxelWorld
 	{
-		int renderDistance = 50;
+		int renderDistance = 40;
 
 		public AtlasManager atlasManager;
 
@@ -340,9 +344,13 @@ namespace HelloWorld
 
 		int toIndex(Vector3 p)
 		{
+			var q = p;
 			p = p - minBounds;
 			var index = (int)(p.X * size.Y * size.Z + p.Y * size.Z + p.Z);
-			System.Diagnostics.Debug.Assert(index >= 0);
+			//if (index < 0)
+			//{
+			//	System.Diagnostics.Debug.Assert(index >= 0, string.Format("invalid position: index={0}, pos={1}, pos0={2}", index, p, q));
+			//}
 			return index;
 		}
 		Vector3 fromIndex(int index)
@@ -356,15 +364,86 @@ namespace HelloWorld
 			return pos + minBounds;
 		}
 
-		// TODO: commit, then cleanup, then commit again
-		// TODO: show tile coordinates, and distance from origin
-		// TODO: do not draw outside world boundary
-		// TODO: tile switcher
-		// TODO: draw line/grid at world boundary
 		// TODO: save/load world state
-		// TODO: collision detection
+		// TODO: physics/collision detection
+		//       - block detection
+		//       - restrict within boundary
+		//       - gravity
+		// TODO: tile switcher
+
+		public void DrawBoundaries()
+		{
+			var min = Voxel.AlignPosition(minBounds) + Vector3.One * -0.51f;
+			var max = Voxel.AlignPosition(maxBounds) + Vector3.One * 0.51f;
+			var org = Vector3.Zero;
+			//rl.DrawLine3D(min, size * Vector3.UnitX, Color.BLACK);
+			//rl.DrawLine3D(min, size * Vector3.UnitY, Color.BLACK);
+			//rl.DrawLine3D(min, size * Vector3.UnitZ, Color.BLACK);
+			var p1 = min;
+			var p2 = min + size * Vector3.UnitZ;
+			var p3 = min + size * Vector3.UnitX;
+			var p4 = min + size * Vector3.UnitX + size * Vector3.UnitZ;
+			var p5 = min + size * Vector3.UnitY;
+			var p6 = min + size * Vector3.UnitY + size * Vector3.UnitZ;
+			var p7 = min + size * Vector3.UnitY + size * Vector3.UnitX;
+			var p8 = min + size;
+
+			//Voxel.DrawCube(p1, Color.RED);
+			//Voxel.DrawCube(p2, Color.BLUE);
+			//Voxel.DrawCube(p3, Color.GREEN);
+			//Voxel.DrawCube(p4, Color.YELLOW);
+			//Voxel.DrawCube(max, Color.VIOLET);
+
+			//Voxel.DrawCube(p5, Color.ORANGE);
+			//Voxel.DrawCube(p6, Color.BLACK);
+			//Voxel.DrawCube(p7, Color.BROWN);
+			//Voxel.DrawCube(p8, Color.GRAY);
+
+			RaylibExt.DrawPlane(p1, p2, p3, p4, new Color(20, 20, 20, 50));
+			RaylibExt.DrawPlane(p5, p6, p7, p8, new Color(20, 20, 20, 50));
+
+			RaylibExt.DrawPlane(p1, p3, p7, p5, new Color(0, 0, 0, 255));
+			RaylibExt.DrawPlane(p3, p7, p8, p4, new Color(0, 0, 0, 255));
+			RaylibExt.DrawPlane(p4, p2, p6, p8, new Color(0, 0, 0, 255));
+			RaylibExt.DrawPlane(p2, p6, p5, p1, new Color(0, 0, 0, 255));
+
+			rl.DrawLine3D(p1, p3, Color.RED);
+
+
+
+
+			//rl.DrawLine3D(max, min + size * Vector3.UnitX, Color.VIOLET);
+			//rl.DrawLine3D(max, min + size * Vector3.UnitY, Color.VIOLET);
+			//rl.DrawLine3D(max, min + size * Vector3.UnitZ, Color.VIOLET);
+
+			//rl.DrawPlane(min + new Vector3(size.X / 2, 0, size.Z / 2), new Vector2(size.X, size.Z), new Color(50, 50, 50, 128));
+			//rl.DrawPlane(min + new Vector3(size.X / 2, -size.Y, size.Z / 2), new Vector2(size.X, size.Z), new Color(50, 50, 50, 128));
+			//rl.DrawLine3D(minBounds, new Vector3(0, maxBounds.Y, 0), Color.BLACK);
+			//rl.DrawLine3D(minBounds, new Vector3(0, 0, maxBounds.Z), Color.BLACK);
+		}
+
+		public void DrawInfo(Ray camRay)
+		{
+			rl.DrawText(string.Format("{0}", Voxel.AlignPosition(camRay.position)), 10, 10, 22, Color.BLACK);
+		}
 
 		public void Draw(Ray ray, Camera3D cam)
+		{
+			DrawBoundaries();
+			DrawRaycastedCubes(ray, cam);
+
+			// switch draw flag to render a cube only once per frame
+			drawFlag = (byte)(drawFlag == 1 ? 2 : 1);
+		}
+
+		// TODO: since I actually don't need pixel-like precision,
+		// raycasting chunks would be way more efficient
+		// but yeah, it's good enough for now
+		// actually, some flickering blocks is kind of annoying
+		// Looks like I really need to do chunking,
+		// with more random blocks, the flickering blocks
+		// becomes more apparent.
+		public void DrawRaycastedCubes(Ray ray, Camera3D cam)
 		{
 			var camUp = cam.Camera.up;
 
@@ -384,28 +463,41 @@ namespace HelloWorld
 			//var m = v * rm.MatrixRotate(up, fovX);
 			var v2 = rm.Vector3RotateByQuaternion(ray.direction, rm.QuaternionFromAxisAngle(up, fov));
 			//var v3 = rm.Vector3RotateByQuaternion(ray.direction, rm.QuaternionFromAxisAngle(ray.direction, fovY));
-			var radius = MathF.Ceiling(MathF.Abs((v2 - farSide).Length())) * 0.6f;
+			var radius = MathF.Ceiling(MathF.Abs((v2 - farSide).Length())) * 0.7f;
 
 
-			iterations = 0;
+			var batchSize = 256;
+			gl.rlCheckRenderBatchLimit(4 * batchSize);
+			gl.rlBegin(DrawMode.QUADS);
+			iterations = 1;
 			// TODO: check if iterateOutwards has excess coordinates
 			foreach (var (n, a, b) in iterateOutwards((int)radius))
 			{
 				var p = ray.position + ray.direction * renderDistance + xStep * a + yStep * b;
 				var u = Vector3.Normalize(p - ray.position);
-				for (var d = 1f; d < renderDistance - n * 1.5; d += 1.0f)
+				for (var d = 1f; d < renderDistance; d += 1.0f)
 				{
-
 					var q = ray.position + u * d;
+					if (OutBounds(q))
+					{
+						break;
+					}
+
 					var found = DrawCube(Voxel.AlignPosition(q));
 					if (found) { break; }
 
 					iterations++;
+					if (iterations % batchSize == 0)
+					{
+						gl.rlEnd();
+						gl.rlSetTexture(0);
+						gl.rlCheckRenderBatchLimit(4 * batchSize);
+						gl.rlBegin(DrawMode.QUADS);
+					}
 				}
 			}
-
-
-			drawFlag = (byte)(drawFlag == 1 ? 2 : 1);
+			gl.rlEnd();
+			gl.rlSetTexture(0);
 		}
 
 
@@ -429,7 +521,7 @@ namespace HelloWorld
 		public bool DrawCube(Vector3 position)
 		{
 			var index = toIndex(position);
-			if (drawBuffer[index] == drawFlag)
+			if (index < 0 || index >= data.Length || drawBuffer[index] == drawFlag)
 			{
 				return false;
 			}
@@ -486,11 +578,31 @@ namespace HelloWorld
 
 		}
 
-		// TODO: do not insert cubes past world boundaries
-		// TODO: draw lines  or planes at boundaries
-		public void InsertCube(Vector3 position, string tileName)
+		public bool OutBounds(Vector3 pos)
 		{
-			var index = toIndex(position);
+			var min = minBounds;
+			var max = maxBounds;
+			return pos.X < min.X ||
+			pos.Y < min.Y ||
+			pos.Z < min.Z ||
+			pos.X >= max.X ||
+			pos.Y >= max.Y ||
+			pos.Z >= max.Z;
+		}
+
+
+		public void InsertCube(Vector3 pos, string tileName)
+		{
+			var index = toIndex(pos);
+			if (OutBounds(pos))
+			{
+				return;
+			}
+
+			if (index < 0 || index >= data.Length)
+			{
+				return;
+			}
 			var subTexture = atlasManager.Lookup(tileName);
 			System.Diagnostics.Debug.Assert(subTexture != null, "tile name must be valid");
 			System.Diagnostics.Debug.Assert(subTexture.texture.id > 0, "tile has no texture");
@@ -630,11 +742,12 @@ namespace HelloWorld
 			bottomLeft = rm.Vector3Add(bottomLeft, cubePos);
 			var color = colorArg.GetValueOrDefault(Color.WHITE);
 
-			gl.rlCheckRenderBatchLimit(4);
+			//gl.rlCheckRenderBatchLimit(4);
+			//gl.rlBegin(DrawMode.QUADS);
+			gl.rlColor4ub(color.r, color.g, color.b, color.a);
+
 			gl.rlSetTexture(texture.id);
 
-			gl.rlBegin(DrawMode.QUADS);
-			gl.rlColor4ub(color.r, color.g, color.b, color.a);
 
 			// Bottom-left corner for texture and quad
 			gl.rlTexCoord2f((float)source.x / texture.width, (float)source.y / texture.height);
@@ -651,9 +764,9 @@ namespace HelloWorld
 			// Bottom-right corner for texture and quad
 			gl.rlTexCoord2f((float)(source.x + source.width) / texture.width, (float)source.y / texture.height);
 			gl.rlVertex3f(topRight.X, topRight.Y, topRight.Z);
-			gl.rlEnd();
 
-			gl.rlSetTexture(0);
+			//gl.rlEnd();
+			//gl.rlSetTexture(0);
 		}
 	}
 
@@ -667,9 +780,9 @@ namespace HelloWorld
 
 			var cam = new Camera3D();
 
-			cam.Setup(50, new Vector3(0, 1.5f, 0));
+			cam.Setup(45, new Vector3(0, 1.5f, 0));
 			rl.DisableCursor();
-			cam.MoveSpeed = new Vector3(1.8f);
+			cam.MoveSpeed = new Vector3(3.5f);
 
 
 			var tree = rl.LoadTexture("assets/tree_single.png");
@@ -683,9 +796,19 @@ namespace HelloWorld
 			var cubes1 = new System.Collections.Generic.List<Vector3>();
 			var cubes2 = new System.Collections.Generic.List<Vector3>();
 
-			var world = new VoxelWorld(new Vector3(-200, -200, -100), new Vector3(200, 200, 100));
+			var world = new VoxelWorld(new Vector3(-50, -5, -50), new Vector3(50, 5, 50));
 			world.atlasManager = AtlasManager.Init();
 			Console.WriteLine("world data size: {0}", world.data.Length);
+
+			var r = new Random();
+			foreach (var (n, a, b) in world.iterateOutwards(25))
+			{
+				world.InsertCube(new Vector3(a + r.Next(1, 2), a + r.Next(1, 2), b + n), "greenwall");
+			}
+			foreach (var (n, a, b) in world.iterateOutwards(25))
+			{
+				world.InsertCube(new Vector3(a + n + r.Next(1, 5), b + r.Next(1, 5), b + r.Next(1, 5)), "greenwall");
+			}
 
 			while (!rl.WindowShouldClose())
 			{
@@ -737,15 +860,16 @@ namespace HelloWorld
 				cam.BeginMode3D();
 
 
-
+				world.Draw(camRay, cam);
 				rl.BeginShaderMode(shader);
+
+
 
 				var srcRec = new Rectangle(0, 0, tree.width, tree.height);
 				var up = new Vector3(0, 1, 0);
 				var size = new Vector2(1, 1);
 
-				Voxel.DrawCubeWires(Voxel.AlignPosition(camRay.position + camRay.direction * 1.5f), Color.RED);
-				world.Draw(camRay, cam);
+				//Voxel.DrawCubeWires(Voxel.AlignPosition(camRay.position + camRay.direction * 1.5f), Color.RED);
 
 				Debug.DrawOrigin();
 
@@ -754,8 +878,7 @@ namespace HelloWorld
 				cam.EndMode3D();
 				rl.DrawFPS(rl.GetScreenWidth() - 100, 10);
 				rl.DrawText(string.Format("iter={0}", world.iterations), 10, 500, 22, Color.RED);
-
-
+				world.DrawInfo(camRay);
 
 
 				rl.EndDrawing();

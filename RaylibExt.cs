@@ -320,6 +320,45 @@ namespace HelloWorld
 
 	unsafe class RaylibExt
 	{
+
+
+		// TODO:
+		public static void DrawPlane(Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4, Color color)
+		{
+			var v1 = p2 - p1;
+			var v2 = p3 - p2;
+			var centerPos = p1 + v1 / 2 + v2 / 2;
+
+			gl.rlCheckRenderBatchLimit(8);
+
+			// NOTE: Plane is always created on XZ ground
+			gl.rlPushMatrix();
+			//gl.rlTranslatef(centerPos.X, -centerPos.Y, centerPos.Z);
+			//gl.rlScalef(size.x, 1.0f, size.y);
+
+			gl.rlBegin(DrawMode.QUADS);
+			gl.rlColor4ub(color.r, color.g, color.b, color.a);
+			//gl.rlNormal3f(0, 1, 0);
+
+			gl.rlVertex3f(p1.X, p1.Y, p1.Z);
+			gl.rlVertex3f(p2.X, p2.Y, p2.Z);
+			gl.rlVertex3f(p3.X, p3.Y, p3.Z);
+			gl.rlVertex3f(p4.X, p4.Y, p4.Z);
+
+			gl.rlVertex3f(p4.X, p4.Y, p4.Z);
+			gl.rlVertex3f(p3.X, p3.Y, p3.Z);
+			gl.rlVertex3f(p2.X, p2.Y, p2.Z);
+			gl.rlVertex3f(p1.X, p1.Y, p1.Z);
+
+			//gl.rlVertex3f(-0.5f, 0.0f, -0.5f);
+			//gl.rlVertex3f(-0.5f, 0.0f, 0.5f);
+			//gl.rlVertex3f(0.5f, 0.0f, 0.5f);
+			//gl.rlVertex3f(0.5f, 0.0f, -0.5f);
+
+			gl.rlEnd();
+			gl.rlPopMatrix();
+		}
+
 		public static float[] MatrixToBuffer(Matrix4x4 matrix)
 		{
 			float[] buffer = new float[16];
