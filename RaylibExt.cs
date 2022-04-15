@@ -7,6 +7,7 @@ using rm = Raylib_cs.Raymath;
 using System.Text;
 using System.Collections.Generic;
 using Math = System.MathF;
+using System;
 
 namespace HelloWorld
 {
@@ -66,7 +67,7 @@ namespace HelloWorld
 		protected Vector3 CameraPosition = new Vector3(0.0f, 0.0f, 0.0f);
 
 		protected Camera3D ViewCamera = new Camera3D();
-		protected Vector2 FOV = new Vector2(0.0f, 0.0f);
+		public Vector2 FOV = new Vector2(0.0f, 0.0f);
 
 		protected Vector2 PreviousMousePosition = new Vector2(0.0f, 0.0f);
 
@@ -318,9 +319,111 @@ namespace HelloWorld
 		}
 	}
 
-	unsafe class RaylibExt
+	unsafe class R
 	{
+		public static Vector3 CrossN(Vector3 v1, Vector3 v2)
+		{
+			return Vector3.Normalize(Vector3.Cross(v1, v2));
+		}
 
+
+		public static IEnumerable<Vector2> IterateOutwards(int width, int height, int stepSize)
+		{
+			//var points = new List<Vector2>();
+
+			var w = width / 2;
+			var h = height / 2;
+			yield return new Vector2(0, 0);
+			//yield return new Vector2(-w, 0);
+			//yield return new Vector2(-w, -h);
+			//yield return new Vector2(-w, h);
+			//yield return new Vector2(w, 0);
+			//yield return new Vector2(w, -h);
+			//yield return new Vector2(w, h);
+			//yield return new Vector2(0, h);
+			//yield return new Vector2(0, -h);
+
+			for (var x = -w; x <= w; x += stepSize)
+			{
+				yield return new Vector2(x, 0);
+				yield return new Vector2(x, h);
+				yield return new Vector2(x, -h);
+			}
+			for (var y = -h; y <= h; y += stepSize)
+			{
+				yield return new Vector2(0, y);
+				yield return new Vector2(w, y);
+				yield return new Vector2(-w, y);
+			}
+
+
+			//points.Add(new Vector2(0, 0));
+			for (var x = -w + stepSize; x < w; x += stepSize)
+			{
+				for (var y = -h + stepSize; y < h; y += stepSize)
+				{
+					if (x == 0 || y == 0)
+					{
+						continue;
+					}
+					//points.Add(new Vector2(x, y));
+					yield return new Vector2(x, y);
+				}
+			}
+
+			//points.Sort((a, b) => (int)(a.Length() - b.Length()));
+			//return points;
+		}
+
+		//public static Vector2 GetFarsideDimension(Vector3 forward, Vector3 worldUp, float fov, int renderDistance)
+		public static Vector2 GetFarsideDimension(float fov, float renderDistance)
+		{
+			return new Vector2(
+			//2 * renderDistance / MathF.Tan(rl.DEG2RAD * fov.X),
+			//2 * renderDistance / MathF.Tan(rl.DEG2RAD * fov.Y)
+			2 * MathF.Tan(rl.DEG2RAD * fov / 2) * renderDistance,
+			2 * MathF.Tan(rl.DEG2RAD * fov / 2) * renderDistance
+			);
+			/*
+			*/
+
+			// TODO? use camera.Camera.fov instead
+			// angle = 2 tanInv(r/h)
+			// angle/2 = tanInv(r/h)
+			// tan(angle/2) = r/h
+			// tan(angle/2)*h = r
+			// the fuck, this is already what I'm doing!?!
+			// woah, it actually works!??! 
+			/*
+			var (right, up) = GetOrthogonalAxis(forward, worldUp);
+
+			var farSide = forward * renderDistance;
+			var xDir = rm.Vector3RotateByQuaternion(forward, rm.QuaternionFromAxisAngle(up, fov.X * rl.DEG2RAD));
+			var yDir = rm.Vector3RotateByQuaternion(forward, rm.QuaternionFromAxisAngle(right, fov.X * rl.DEG2RAD));
+
+			return new Vector2(
+				(xDir * renderDistance - farSide).Length(),
+				(yDir * renderDistance - farSide).Length()
+			);
+			*/
+		}
+
+
+		// TODO:
+		public static (Vector3, Vector3) GetOrthogonalAxis(Vector3 direction, Vector3 worldUp)
+		{
+			// TODO: I think normalizing right and up would do just fine
+			var right = R.CrossN(direction, worldUp);
+			var left = Vector3.Negate(right);
+			var up = R.CrossN(right, direction);
+			var down = Vector3.Negate(up);
+
+			var xStep = Vector3.Normalize(right - left);
+			var yStep = Vector3.Normalize(up - down);
+
+			//return (xStep, yStep);
+			return (right, up);
+		}
 
 		// TODO:
 		public static void DrawPlane(Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4, Color color)
