@@ -13,7 +13,46 @@ namespace VoxelEditor
 {
 	unsafe class R
 	{
+		public static Vector3 Vector3Half = Vector3.One * 0.5f;
+		public static Vector3 Vector3Oneth = Vector3.One * 0.1f;
 
+		public static bool InCube(Vector3 cubePos, Vector3 pos, float cubeSize = 1)
+		{
+			var start = cubePos;
+			var end = cubePos + Vector3.One * cubeSize;
+			return pos.X >= start.X && pos.Y >= start.Y && pos.Z >= start.Z
+				&& pos.X < end.X && pos.Y < end.Y && pos.Z < end.Z;
+		}
+
+		public static Vector3 Vector3Project(Vector3 v, Vector3 w)
+		{
+			return Vector3.Dot(v, w) / w.LengthSquared() * w;
+		}
+
+		public static Vector3 Vector3Abs(Vector3 v)
+		{
+			v.X = MathF.Abs(v.X);
+			v.Y = MathF.Abs(v.Y);
+			v.Z = MathF.Abs(v.Z);
+			return v;
+		}
+
+		public static Vector3 Vector3Round(Vector3 v)
+		{
+			v.X = MathF.Round(v.X, 6);
+			v.Y = MathF.Round(v.Y, 6);
+			v.Z = MathF.Round(v.Z, 6);
+			return v;
+		}
+
+		public static Vector3 ClampV(Vector3 v, Vector3 min, Vector3 max)
+		{
+			v.X = MathF.Min(MathF.Max(v.X, min.X), max.X);
+			v.Y = MathF.Min(MathF.Max(v.Y, min.Y), max.Y);
+			v.Z = MathF.Min(MathF.Max(v.Z, min.Z), max.Z);
+
+			return v;
+		}
 
 		public static Vector3 CrossN(Vector3 v1, Vector3 v2)
 		{
@@ -23,19 +62,9 @@ namespace VoxelEditor
 
 		public static IEnumerable<Vector2> IterateOutwards(int width, int height, int stepSize)
 		{
-			//var points = new List<Vector2>();
-
 			var w = width / 2;
 			var h = height / 2;
 			yield return new Vector2(0, 0);
-			//yield return new Vector2(-w, 0);
-			//yield return new Vector2(-w, -h);
-			//yield return new Vector2(-w, h);
-			//yield return new Vector2(w, 0);
-			//yield return new Vector2(w, -h);
-			//yield return new Vector2(w, h);
-			//yield return new Vector2(0, h);
-			//yield return new Vector2(0, -h);
 
 			for (var x = -w; x <= w; x += stepSize)
 			{
@@ -51,7 +80,6 @@ namespace VoxelEditor
 			}
 
 
-			//points.Add(new Vector2(0, 0));
 			for (var x = -w + stepSize; x < w; x += stepSize)
 			{
 				for (var y = -h + stepSize; y < h; y += stepSize)
@@ -60,66 +88,35 @@ namespace VoxelEditor
 					{
 						continue;
 					}
-					//points.Add(new Vector2(x, y));
 					yield return new Vector2(x, y);
 				}
 			}
 
-			//points.Sort((a, b) => (int)(a.Length() - b.Length()));
-			//return points;
 		}
 
-		//public static Vector2 GetFarsideDimension(Vector3 forward, Vector3 worldUp, float fov, int renderDistance)
 		public static Vector2 GetFarsideDimension(float fov, float renderDistance)
 		{
 			return new Vector2(
-			//2 * renderDistance / MathF.Tan(rl.DEG2RAD * fov.X),
-			//2 * renderDistance / MathF.Tan(rl.DEG2RAD * fov.Y)
 			2 * MathF.Tan(rl.DEG2RAD * fov / 2) * renderDistance,
 			2 * MathF.Tan(rl.DEG2RAD * fov / 2) * renderDistance
 			);
-			/*
-			*/
-
-			// TODO? use camera.Camera.fov instead
-			// angle = 2 tanInv(r/h)
-			// angle/2 = tanInv(r/h)
-			// tan(angle/2) = r/h
-			// tan(angle/2)*h = r
-			// the fuck, this is already what I'm doing!?!
-			// woah, it actually works!??! 
-			/*
-			var (right, up) = GetOrthogonalAxis(forward, worldUp);
-
-			var farSide = forward * renderDistance;
-			var xDir = rm.Vector3RotateByQuaternion(forward, rm.QuaternionFromAxisAngle(up, fov.X * rl.DEG2RAD));
-			var yDir = rm.Vector3RotateByQuaternion(forward, rm.QuaternionFromAxisAngle(right, fov.X * rl.DEG2RAD));
-
-			return new Vector2(
-				(xDir * renderDistance - farSide).Length(),
-				(yDir * renderDistance - farSide).Length()
-			);
-			*/
 		}
 
 
-		// TODO:
 		public static (Vector3, Vector3) GetOrthogonalAxis(Vector3 direction, Vector3 worldUp)
 		{
-			// TODO: I think normalizing right and up would do just fine
 			var right = R.CrossN(direction, worldUp);
-			var left = Vector3.Negate(right);
 			var up = R.CrossN(right, direction);
-			var down = Vector3.Negate(up);
-
-			var xStep = Vector3.Normalize(right - left);
-			var yStep = Vector3.Normalize(up - down);
+			//var left = Vector3.Negate(right);
+			//var down = Vector3.Negate(up);
+			//var xStep = Vector3.Normalize(right - left);
+			//var yStep = Vector3.Normalize(up - down);
 
 			//return (xStep, yStep);
 			return (right, up);
 		}
 
-		// TODO:
+		// Draws on both side
 		public static void DrawPlane(Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4, Color color)
 		{
 			var v1 = p2 - p1;
@@ -128,14 +125,10 @@ namespace VoxelEditor
 
 			gl.rlCheckRenderBatchLimit(8);
 
-			// NOTE: Plane is always created on XZ ground
 			gl.rlPushMatrix();
-			//gl.rlTranslatef(centerPos.X, -centerPos.Y, centerPos.Z);
-			//gl.rlScalef(size.x, 1.0f, size.y);
 
 			gl.rlBegin(DrawMode.QUADS);
 			gl.rlColor4ub(color.r, color.g, color.b, color.a);
-			//gl.rlNormal3f(0, 1, 0);
 
 			gl.rlVertex3f(p1.X, p1.Y, p1.Z);
 			gl.rlVertex3f(p2.X, p2.Y, p2.Z);
@@ -146,11 +139,6 @@ namespace VoxelEditor
 			gl.rlVertex3f(p3.X, p3.Y, p3.Z);
 			gl.rlVertex3f(p2.X, p2.Y, p2.Z);
 			gl.rlVertex3f(p1.X, p1.Y, p1.Z);
-
-			//gl.rlVertex3f(-0.5f, 0.0f, -0.5f);
-			//gl.rlVertex3f(-0.5f, 0.0f, 0.5f);
-			//gl.rlVertex3f(0.5f, 0.0f, 0.5f);
-			//gl.rlVertex3f(0.5f, 0.0f, -0.5f);
 
 			gl.rlEnd();
 			gl.rlPopMatrix();

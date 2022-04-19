@@ -5,11 +5,21 @@
     <TargetFramework>net6.0</TargetFramework>
     <RootNamespace>rlib_cs</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <StartupObject>VoxelEditor.Program</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Coroutine" Version="2.1.3" />
     <PackageReference Include="ImGui.NET" Version="1.78.0" />
+    <PackageReference Include="NLua" Version="1.6.0" />
     <PackageReference Include="Raylib-cs" Version="4.0.0.1" />
+
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
+    <PackageReference Include="xunit" Version="2.4.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
 </Project>
