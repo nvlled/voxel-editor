@@ -77,9 +77,16 @@ namespace VoxelEditor
 			atlasMan.AddLookup("greenwall-1", rogueAtlas, 2, 1);
 			atlasMan.AddLookup("greenwall", rogueAtlas, new int[] { 192, 193, 194, 195 });
 			atlasMan.AddLookup("mazewall", rogueAtlas, new int[] { 196, 197, 198, 199, 200 });
-			atlasMan.AddLookup("sand", rogueAtlas, new int[] { 381, 382, 383, 384, 385, 386, 387, 388 });
 			atlasMan.AddLookup("marble", rogueAtlas, new int[] { 571, 572, 573, 574, 575, 576, 577 });
 			atlasMan.AddLookup("brick", rogueAtlas, new int[] { 389, 391, 393 });
+			atlasMan.AddLookup("stone", rogueAtlas, new int[] { 1045, 1046, 1047, 1048, 1049 });
+			atlasMan.AddLookup("redstone", rogueAtlas, new int[] { 1057, 1058, 1059, 1060, 1061, 1062 });
+			atlasMan.AddLookup("blue", rogueAtlas, new int[] { 1229, 1230, 1231, 1232, 1234, 1233 });
+			atlasMan.AddLookup("water", rogueAtlas, new int[] { 1473, 1474, 1475, 1476, 1477 });
+			atlasMan.AddLookup("acid", rogueAtlas, new int[] { 1421, 1422, 1423, 1424 });
+			atlasMan.AddLookup("face", rogueAtlas, new int[] { 1026, 1027, 1028 });
+			atlasMan.AddLookup("syms", rogueAtlas, new int[] { 1153, 1154, 1155, 1156, 1157, 1158, 1159, 1160, 1161 });
+			atlasMan.AddLookup("bee", rogueAtlas, new int[] { 877, 878, 879, 880, 881, 882 });
 
 
 			return atlasMan;

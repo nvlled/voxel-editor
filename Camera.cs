@@ -80,6 +80,8 @@ namespace VoxelEditor
 
 		public float JumpHeight = 0;
 
+		public Ray ray;
+
 		public FPCamera()
 		{
 			ControlsKeys.Add(CameraControls.MOVE_FRONT, KeyboardKey.KEY_W);
@@ -150,6 +152,9 @@ namespace VoxelEditor
 
 		public void Update()
 		{
+
+			ray = rl.GetMouseRay(new Vector2(rl.GetScreenWidth() / 2, rl.GetScreenHeight() / 2), Camera);
+
 			if (HideCursor && rl.IsWindowFocused() != Focused && (UseMouseX || UseMouseY))
 			{
 				Focused = rl.IsWindowFocused();

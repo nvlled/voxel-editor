@@ -20,6 +20,44 @@ namespace VoxelEditor
 		B
 	}
 
+	enum CubeSideType : byte
+	{
+		TOP,
+		LEFT,
+		RIGHT,
+		FRONT,
+		BACK,
+		BOTTOM,
+
+	}
+
+	public class SideAxis
+	{
+		/*
+					( new Vector3(0, 0, -1), new Vector3(1, 0, 0)),
+					 (new Vector3(0, 1, 0), new Vector3(0, 0, -1)),
+					 (new Vector3(0, 1, 0), new Vector3(0, 0, 1)),
+					 (new Vector3(0, 1, 0), new Vector3(1, 0, 0)),
+					 (new Vector3(0, 1, 0), new Vector3(-1, 0, 0)),
+					 (new Vector3(0, 0, -1), new Vector3(-1, 0, 0)),
+		*/
+		public static (Vector3, Vector3)[] map = new (Vector3, Vector3)[] {
+			// new Vector3(1, 0, -1),
+			// new Vector3(0, 1, -1),
+			// new Vector3(0, 1, 1),
+			// new Vector3(1, 1, 0),
+			// new Vector3(-1, 1, 0),
+			// new Vector3(-1, 0, -1),
+			(new Vector3(0, 0, -1), new Vector3(1, 0, 0)),
+			(new Vector3(0, 1, 0), new Vector3(0, 0, -1)),
+			(new Vector3(0, 1, 0), new Vector3(0, 0, 1)),
+			(new Vector3(0, 1, 0), new Vector3(1, 0, 0)),
+			(new Vector3(0, 1, 0), new Vector3(-1, 0, 0)),
+			(new Vector3(0, 0, -1), new Vector3(-1, 0, 0)),
+		};
+	}
+
+
 	class VoxelChunk
 	{
 		public DrawFlag drawFlag;
@@ -82,7 +120,7 @@ namespace VoxelEditor
 	// so that alone will simplify a lot of things for me,
 	// and I don't have to worry about using fancy datastructures
 	// or optimizations. Or at most, I would use spatial hash.
-	class VoxelWorld
+	unsafe class VoxelWorld
 	{
 		public int renderDistance = Config.renderDistance;
 		public int chunkSize = Config.chunkSize;
@@ -92,17 +130,22 @@ namespace VoxelEditor
 		public VoxelCube[] data;
 		public VoxelChunk[] chunks;
 		public DrawFlag drawFlag;
-		//public byte[] drawBuffer;
-		public byte[] drawChunkBuffer;
+		public int sidesDrawn = 0;
 
 		public List<Entity> entities;
 		public Vector3 minBounds;
 		public Vector3 maxBounds;
+		public Vector3 minChunkBounds;
+		public Vector3 maxChunkBounds;
 		public Vector3 size;
 
 		public int iterations;
 
-		HashSet<int> renderCache = new HashSet<int>();
+		public Camera3D cam;
+
+
+		Model modelB = rl.LoadModelFromMesh(rl.GenMeshCube(1.0f, 1.0f, 1.0f));
+		Texture2D modelTexture = rl.LoadTexture("assets/texel_checker.png");
 
 
 
@@ -115,6 +158,8 @@ namespace VoxelEditor
 		{
 			minBounds = min;
 			maxBounds = max;
+			minChunkBounds = Voxel.GetChunkPosition(chunkSize, min + Vector3.One);
+			maxChunkBounds = Voxel.GetChunkPosition(chunkSize, max + Vector3.One);
 			size = max - min;
 
 			var dataSize = (int)size.X * (int)size.Y * (int)size.Z;
@@ -123,6 +168,8 @@ namespace VoxelEditor
 			chunks = new VoxelChunk[dataSize / chunkSize];
 			//drawBuffer = new byte[dataSize];
 			//drawChunkBuffer = new byte[dataSize / chunkSize];
+
+			modelB.materials[0].maps[(int)MaterialMapIndex.MATERIAL_MAP_DIFFUSE].texture = modelTexture;
 		}
 
 		public VoxelChunk GetVoxelChunk(Vector3 chunkPos)
@@ -136,17 +183,25 @@ namespace VoxelEditor
 		}
 		public int toChunkIndex(Vector3 chunkPos)
 		{
+			var p = chunkPos;
+			var s = Voxel.GetChunkPosition(chunkSize, size);
+			p = new Vector3(
+				MathF.Floor(rm.Remap(p.X, minChunkBounds.X, maxChunkBounds.X, 0, size.X)),
+				MathF.Floor(rm.Remap(p.Y, minChunkBounds.Y, maxChunkBounds.Y, 0, size.Y)),
+				MathF.Floor(rm.Remap(p.Z, minChunkBounds.Z, maxChunkBounds.Z, 0, size.Z))
+			);
 
-			chunkPos = chunkPos - minBounds / chunkSize;
-			var s = size / chunkSize;
-			var index = (int)(chunkPos.X * s.Y * s.Z + chunkPos.Y * s.Z + chunkPos.Z);
+			var index = (int)((p.X + 1) * s.Y * s.Z + (p.Y + 1) * s.Z + p.Z);
 			return index;
 		}
 		public int toIndex(Vector3 p)
 		{
-			var q = p;
-			p = p - minBounds;
-			var index = (int)(p.X * size.Y * size.Z + p.Y * size.Z + p.Z);
+			p = new Vector3(
+				rm.Remap(p.X, minBounds.X, maxBounds.X, 0, size.X),
+				rm.Remap(p.Y, minBounds.Y, maxBounds.Y, 0, size.Y),
+				rm.Remap(p.Z, minBounds.Z, maxBounds.Z, 0, size.Z)
+			);
+			var index = (int)((p.X + 1) * size.Y * size.Z + (p.Y + 1) * size.Z + p.Z);
 			return index;
 		}
 		Vector3 fromIndex(int index)
@@ -167,14 +222,27 @@ namespace VoxelEditor
 		//       - gravity
 		// TODO: tile switcher
 
+		public void DrawBoundaryPlane(Color color, params Vector3[] ps)
+		{
+			R.DrawPlane(ps[0], ps[1], ps[2], ps[3], color);
+
+			var r = 0.5f;
+			var c = Color.RED;
+			for (var i = 0; i < ps.Length; i++)
+			{
+				rl.DrawCylinderEx(ps[i], ps[(i + 1) % ps.Length], r, r, 5, c);
+			}
+			//R.DrawPlane(p3, p7, p8, p4, new Color(50, 50, 50, 255));
+			//R.DrawPlane(p4, p2, p6, p8, new Color(50, 50, 50, 255));
+			//R.DrawPlane(p2, p6, p5, p1, new Color(50, 50, 50, 255));
+
+		}
+
 		public void DrawBoundaries()
 		{
 			var min = Voxel.AlignPosition(minBounds) + Vector3.One * -0.51f;
 			var max = Voxel.AlignPosition(maxBounds) + Vector3.One * 0.51f;
-			var org = Vector3.Zero;
-			//rl.DrawLine3D(min, size * Vector3.UnitX, Color.BLACK);
-			//rl.DrawLine3D(min, size * Vector3.UnitY, Color.BLACK);
-			//rl.DrawLine3D(min, size * Vector3.UnitZ, Color.BLACK);
+
 			var p1 = min;
 			var p2 = min + size * Vector3.UnitZ;
 			var p3 = min + size * Vector3.UnitX;
@@ -184,57 +252,33 @@ namespace VoxelEditor
 			var p7 = min + size * Vector3.UnitY + size * Vector3.UnitX;
 			var p8 = min + size;
 
-			//Voxel.DrawCube(p1, Color.RED);
-			//Voxel.DrawCube(p2, Color.BLUE);
-			//Voxel.DrawCube(p3, Color.GREEN);
-			//Voxel.DrawCube(p4, Color.YELLOW);
-			//Voxel.DrawCube(max, Color.VIOLET);
 
-			//Voxel.DrawCube(p5, Color.ORANGE);
-			//Voxel.DrawCube(p6, Color.BLACK);
-			//Voxel.DrawCube(p7, Color.BROWN);
-			//Voxel.DrawCube(p8, Color.GRAY);
-
-			R.DrawPlane(p1, p2, p3, p4, new Color(20, 20, 20, 220));
-			R.DrawPlane(p5, p6, p7, p8, new Color(20, 20, 20, 220));
-
-			R.DrawPlane(p1, p3, p7, p5, new Color(50, 50, 50, 255));
-			R.DrawPlane(p3, p7, p8, p4, new Color(50, 50, 50, 255));
-			R.DrawPlane(p4, p2, p6, p8, new Color(50, 50, 50, 255));
-			R.DrawPlane(p2, p6, p5, p1, new Color(50, 50, 50, 255));
-
-			rl.DrawLine3D(p1, p3, Color.RED);
-
-
-
-
-			//rl.DrawLine3D(max, min + size * Vector3.UnitX, Color.VIOLET);
-			//rl.DrawLine3D(max, min + size * Vector3.UnitY, Color.VIOLET);
-			//rl.DrawLine3D(max, min + size * Vector3.UnitZ, Color.VIOLET);
-
-			//rl.DrawPlane(min + new Vector3(size.X / 2, 0, size.Z / 2), new Vector2(size.X, size.Z), new Color(50, 50, 50, 128));
-			//rl.DrawPlane(min + new Vector3(size.X / 2, -size.Y, size.Z / 2), new Vector2(size.X, size.Z), new Color(50, 50, 50, 128));
-			//rl.DrawLine3D(minBounds, new Vector3(0, maxBounds.Y, 0), Color.BLACK);
-			//rl.DrawLine3D(minBounds, new Vector3(0, 0, maxBounds.Z), Color.BLACK);
+			var c = Color.DARKBLUE;
+			DrawBoundaryPlane(c, p1, p3, p7, p5);
+			DrawBoundaryPlane(c, p3, p7, p8, p4);
+			DrawBoundaryPlane(c, p4, p2, p6, p8);
+			DrawBoundaryPlane(c, p2, p6, p5, p1);
+			DrawBoundaryPlane(c, p1, p2, p3, p4);
+			DrawBoundaryPlane(c, p5, p6, p7, p8);
 		}
 
-		public void DrawInfo(VoxelWorld world, Ray camRay)
+		public void DrawInfo(VoxelWorld world)
 		{
-			rl.DrawText(string.Format("{0}", Voxel.AlignPosition(camRay.position)), 10, 10, 22, Color.BLACK);
-			rl.DrawText(string.Format("{0}", Voxel.GetChunkPosition(world.chunkSize, camRay.position)), 10, 30, 22, Color.BLACK);
+			rl.DrawText(string.Format("{0}", Voxel.AlignPosition(cam.ray.position)), 10, 10, 22, Color.BLACK);
+			rl.DrawText(string.Format("{0}", Voxel.GetChunkPosition(world.chunkSize, cam.ray.position)), 10, 30, 22, Color.BLACK);
 		}
 
-		public void Draw(Ray ray, Camera3D cam)
+		public void Draw(Camera3D cam)
 		{
 			drawFlag = drawFlag == DrawFlag.A ? DrawFlag.B : DrawFlag.A;
 
 			DrawBoundaries();
-			DrawRaycastedCubes(ray, cam);
+			DrawRaycastedCubes(cam.ray);
 
 			// switch draw flag to render a cube only once per frame
 		}
 
-		public IEnumerable<Vector3> IterateRayCastedChunks(Ray ray, Camera3D cam)
+		public IEnumerable<Vector3> IterateRayCastedChunks(Ray ray)
 		{
 			var (right, up) = R.GetOrthogonalAxis(ray.direction, cam.Camera.up);
 			var size = R.GetFarsideDimension(cam.GetFOVX(), renderDistance + 0);
@@ -286,11 +330,11 @@ namespace VoxelEditor
 
 		}
 
-		public Vector3[] GetRayCastedChunks(Ray ray, Camera3D cam)
+		public Vector3[] GetRayCastedChunks(Ray ray)
 		{
 			var result = new List<Vector3>();
 
-			foreach (var chunkPos in IterateRayCastedChunks(ray, cam))
+			foreach (var chunkPos in IterateRayCastedChunks(ray))
 			{
 				var data = GetVoxelChunk(chunkPos);
 				if (data == null)
@@ -302,12 +346,13 @@ namespace VoxelEditor
 
 			return result.ToArray();
 		}
-		public void DrawRaycastedCubes(Ray ray, Camera3D cam)
+		public void DrawRaycastedCubes(Ray ray)
 		{
 
-			var center = ray.position + ray.direction * renderDistance;
+			var center = cam.ray.position + cam.ray.direction * renderDistance;
 			iterations = 0;
-			foreach (var chunkPos in IterateRayCastedChunks(ray, cam))
+			sidesDrawn = 0;
+			foreach (var chunkPos in IterateRayCastedChunks(ray))
 			{
 				var chunkIndex = toChunkIndex(chunkPos);
 
@@ -334,12 +379,17 @@ namespace VoxelEditor
 				var batchSize = 5000;
 				var drawnCubes = 0;
 				Voxel.StartDrawTile(batchSize);
+
+				// TODO: optmize by project p to the camera axis
+				//       skip next chunk in the ray if a whole "wall" is formed
+				//       also skip next cube "wall" 
 				foreach (var p in IterateChunk(chunkSize, chunkPos))
 				{
 					if (DrawCube(p))
 					{
 						drawnCubes++;
 					}
+
 					if (drawnCubes > chunks[chunkIndex].cubeCount)
 					{
 						break;
@@ -354,57 +404,12 @@ namespace VoxelEditor
 				}
 				Voxel.EndDrawTile();
 			}
+			Console.WriteLine("sides drawn: {0}", sidesDrawn);
 
 		}
 
-		/*
-			public void DrawRaycastedCubes(Ray ray, Camera3D cam)
-			{
-				var camUp = cam.Camera.up;
-
-				var right = R.CrossN(ray.direction, camUp);
-				var left = Vector3.Negate(right);
-				var up = R.CrossN(ray.direction, right);
-				var down = Vector3.Negate(up);
-
-				var xStep = Vector3.Normalize(right - left);
-				var yStep = Vector3.Normalize(up - down);
-
-				var farSide = ray.direction * renderDistance;
-				var fovX = cam.GetFOVX();
-				var fovY = cam.Camera.fovy;
-				var fov = MathF.Max(fovX, fovY);
-
-				//var m = v * rm.MatrixRotate(up, fovX);
-				var v2 = rm.Vector3RotateByQuaternion(ray.direction, rm.QuaternionFromAxisAngle(up, fov));
-				//var v3 = rm.Vector3RotateByQuaternion(ray.direction, rm.QuaternionFromAxisAngle(ray.direction, fovY));
-				var radius = MathF.Ceiling(MathF.Abs((v2 - farSide).Length())) * 0.5f;
-
-
-				var batchSize = 300;
-
-				for (var d = 1f; d < renderDistance; d += chunkSize)
-				{
-
-					var p = ray.position + ray.direction * renderDistance;
-					var u = Vector3.Normalize(p - ray.position);
-					var q = ray.position + u * d;
-
-					var chunkPos = Voxel.GetChunkPosition(chunkSize, q);
-
-					var chunkIndex = toChunkIndex(chunkPos);
-					if (chunkIndex < 0 || chunkIndex >= chunks.Length || chunks[chunkIndex].drawFlag == drawFlag)
-					{
-						continue;
-					}
-					chunks[chunkIndex].drawFlag = drawFlag;
-				}
-			}
-			*/
-
 		public IEnumerable<Vector3> IterateChunk(int chunkSize, Vector3 chunkPos)
 		{
-			// TODO: check for off-by-one errors
 			// TODO: can be optimized by iterating from two opposite corners of the chunk
 			for (var x = 0; x < chunkSize; x++)
 			{
@@ -412,10 +417,6 @@ namespace VoxelEditor
 				{
 					for (var z = 0; z < chunkSize; z++)
 					{
-						// holy fucking crap I'm so dumb
-						// what the fuck why didn't I multiply the chunkSize
-						// it's a sign that I should really keep things tidy
-						// and review my code every now and then
 						yield return new Vector3(chunkPos.X * chunkSize + x, chunkPos.Y * chunkSize + y, chunkPos.Z * chunkSize + z);
 					}
 				}
@@ -423,38 +424,6 @@ namespace VoxelEditor
 			}
 		}
 
-		public IEnumerable<(float, float, float)> IterateChunkOutwards(int radius)
-		{
-
-			yield return (0, 0, 0);
-			for (var n = 1f; n <= radius; n += 1)
-			{
-				for (var a = -n; a <= n; a++)
-				{
-					yield return (n, n, a);
-					yield return (n, -n, a);
-					yield return (n, a, n);
-					yield return (n, a, -n);
-				}
-			}
-		}
-
-		public IEnumerable<(float, float, float)> IterateOutwards(int radius)
-		{
-			yield return (0, 0, 0);
-			var inc = 1.0f;
-			for (var n = 1f; n <= radius; n += inc)
-			{
-				for (var a = -n; a <= n; a++)
-				{
-					yield return (n, n, a);
-					yield return (n, -n, a);
-					yield return (n, a, n);
-					yield return (n, a, -n);
-				}
-				inc += 0.01f;
-			}
-		}
 
 		public bool DrawCube(Vector3 position)
 		{
@@ -488,10 +457,11 @@ namespace VoxelEditor
 
 				var useUniformSide = cube.uniform || index >= cube.data.Length;
 				var side = useUniformSide ? uniformSide : cube.data[index];
-				var sideType = (CubeSideType)index;
+				var sideType = index;
 				var (texture, region) = side.body.subTexture;
 
 
+				//Voxel.DrawCubeWires(position, Color.GREEN);
 				if (texture.id == 0)
 				{
 					Voxel.DrawCube(position, Color.DARKBLUE);
@@ -499,12 +469,20 @@ namespace VoxelEditor
 				}
 				else
 				{
-					Voxel.DrawTile(texture: ref texture, source: ref region, cubePos: position, side: CubeSideType.FRONT, sizeArg: side.body.scale);
-					Voxel.DrawTile(texture: ref texture, source: ref region, cubePos: position, side: CubeSideType.BACK, sizeArg: side.body.scale);
-					Voxel.DrawTile(texture: ref texture, source: ref region, cubePos: position, side: CubeSideType.RIGHT, sizeArg: side.body.scale);
-					Voxel.DrawTile(texture: ref texture, source: ref region, cubePos: position, side: CubeSideType.LEFT, sizeArg: side.body.scale);
-					Voxel.DrawTile(texture: ref texture, source: ref region, cubePos: position, side: CubeSideType.TOP, sizeArg: side.body.scale);
-					Voxel.DrawTile(texture: ref texture, source: ref region, cubePos: position, side: CubeSideType.BOTTOM, sizeArg: side.body.scale);
+					var (up, right) = SideAxis.map[sideType];
+					var normal = Vector3.Cross(up, right);
+					var dot = Vector3.Dot(cam.ray.direction, normal);
+					if (dot <= 0.005f)
+					{
+						continue;
+					}
+					var dataIndex = toIndex(position + -normal);
+					if (data[dataIndex] != null)
+					{
+						continue;
+					}
+					Voxel.DrawTile(texture: ref texture, source: ref region, cubePos: position, side: (CubeSideType)sideType, sizeArg: side.body.scale);
+					sidesDrawn++;
 				}
 			}
 		}

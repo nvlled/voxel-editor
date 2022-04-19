@@ -13,6 +13,8 @@ namespace VoxelEditor
 {
 	unsafe class R
 	{
+
+
 		public static Vector3 CrossN(Vector3 v1, Vector3 v2)
 		{
 			return Vector3.Normalize(Vector3.Cross(v1, v2));

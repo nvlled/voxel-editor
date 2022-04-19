@@ -16,7 +16,7 @@ namespace VoxelEditor
 	public class Config
 	{
 		public static int renderDistance = 100;
-		public static int chunkSize = 8;
+		public static int chunkSize = 10;
 		public static float fov = 50;
 		public static int fps = 60;
 		public static int windowWidth = 1000;
@@ -208,16 +208,6 @@ namespace VoxelEditor
 		}
 	}
 
-	enum CubeSideType : byte
-	{
-		TOP,
-		LEFT,
-		RIGHT,
-		FRONT,
-		BACK,
-		BOTTOM,
-	}
-
 	class Entity
 	{
 		public Vector3 position;
@@ -255,40 +245,64 @@ namespace VoxelEditor
 
 			var world = new VoxelWorld(new Vector3(-50, -50, -50), new Vector3(50, 50, 50));
 			world.atlasManager = AtlasManager.Init();
+			world.cam = cam;
+
 			Console.WriteLine("world data size: {0}", world.data.Length);
 
-			var r = new Random();
-			foreach (var (n, a, b) in world.IterateOutwards(25))
-			{
-				world.InsertCube(new Vector3(a + r.Next(1, 2), a + r.Next(1, 2), b + n), "greenwall");
-			}
-			foreach (var (n, a, b) in world.IterateOutwards(25))
-			{
-				world.InsertCube(new Vector3(a + n + r.Next(1, 5), b + r.Next(1, 5), b + r.Next(1, 5)), "greenwall");
-			}
-			world.InsertCube(new Vector3(0, 0, 0), "greenwall");
-			world.InsertCube(new Vector3(1, 0, 0), "greenwall");
-			world.InsertCube(new Vector3(0, 1, 0), "greenwall");
-			world.InsertCube(new Vector3(0, 0, 2), "greenwall");
-			world.InsertCube(new Vector3(-1, 0, 0), "sand");
-			world.InsertCube(new Vector3(-2, 0, 0), "sand");
-			world.InsertCube(new Vector3(-3, 0, 0), "sand");
-			world.InsertCube(new Vector3(-4, 0, 0), "sand");
+			//var r = new Random();
+			//foreach (var (n, a, b) in world.IterateOutwards(25))
+			//{
+			//	world.InsertCube(new Vector3(a + r.Next(1, 2), a + r.Next(1, 2), b + n), "greenwall");
+			//}
+			//foreach (var (n, a, b) in world.IterateOutwards(25))
+			//{
+			//	world.InsertCube(new Vector3(a + n + r.Next(1, 5), b + r.Next(1, 5), b + r.Next(1, 5)), "greenwall");
+			//}
 
-			world.InsertCube(new Vector3(0, -1, 0), "sand");
-			world.InsertCube(new Vector3(0, 0, -1), "sand");
+
+			// TODO: check out how mesh is drawn is raylib
+			// why does this drop frames?
+			// there's only around 600 cubes here
+			//world.InsertCube(new Vector3(0, 0, 0), "face");
+			//world.InsertCube(new Vector3(1, 0, 0), "bee");
+			//world.InsertCube(new Vector3(0, 0, 1), "bee");
+			//world.InsertCube(new Vector3(-1, 0, 0), "bee");
+			FillChunk(world, "bee", new Vector3(0, 0, 0));
+			FillChunk(world, "greenwall", new Vector3(1, 0, 0));
+			FillChunk(world, "redstone", new Vector3(-1, 0, 0));
+			FillChunk(world, "stone", new Vector3(0, 0, 1));
+			//FillChunk(world, "brick", new Vector3(0, 0, -1));
+			//FillChunk(world, "syms", new Vector3(1, 0, 1));
+			//FillChunk(world, "face", new Vector3(1, 0, -1));
+			//FillChunk(world, "bee", new Vector3(-1, 0, 1));
+			//FillChunk(world, "acid", new Vector3(-1, 0, -1));
+
+			//world.InsertCube(new Vector3(0, 0, 0), "greenwall");
+			//world.InsertCube(new Vector3(1, 0, 0), "greenwall");
+			//world.InsertCube(new Vector3(0, 1, 0), "greenwall");
+			//world.InsertCube(new Vector3(0, 0, 2), "greenwall");
+			//world.InsertCube(new Vector3(-1, 0, 0), "sand");
+			//world.InsertCube(new Vector3(-2, 0, 0), "sand");
+			//world.InsertCube(new Vector3(-3, 0, 0), "sand");
+			//world.InsertCube(new Vector3(-4, 0, 0), "sand");
+			//world.InsertCube(new Vector3(0, -1, 0), "sand");
+			//world.InsertCube(new Vector3(0, 0, -1), "sand");
 			//world.InsertCube(new Vector3(2, 0, 0), "sand");
 			//world.InsertCube(new Vector3(0, 3, 0), "mazewall");
 
 			var rayCastedChunks = new Vector3[0];
 			var savedDrawFlag = DrawFlag.Init;
 
-			scratch(world);
+			var modelB = rl.LoadModelFromMesh(rl.GenMeshCube(1.0f, 1.0f, 1.0f));
+			var modelTexture = rl.LoadTexture("assets/texel_checker.png");
+			modelB.materials[0].maps[(int)MaterialMapIndex.MATERIAL_MAP_DIFFUSE].texture = modelTexture;
+
 
 			while (!rl.WindowShouldClose())
 			{
 
-				var camRay = rl.GetMouseRay(new Vector2(rl.GetScreenWidth() / 2, rl.GetScreenHeight() / 2), cam.Camera);
+				cam.Update();
+				var camRay = cam.ray;
 				//camRay.direction.Y = 0;
 
 				if (rl.IsKeyDown(KeyboardKey.KEY_LEFT_SHIFT))
@@ -326,7 +340,6 @@ namespace VoxelEditor
 				}
 				else
 				{
-					cam.Update();
 				}
 
 
@@ -350,14 +363,21 @@ namespace VoxelEditor
 
 				cam.BeginMode3D();
 
-
-				world.Draw(camRay, cam);
+				world.Draw(cam);
 				rayCaster.Draw();
+
+				/*
+				foreach (var p in world.IterateChunk(world.chunkSize, new Vector3(0, 0, 0)))
+				{
+					rl.DrawModel(modelB, p, 1.0f, Color.WHITE);
+				}
+				*/
+
 
 				if (rl.IsMouseButtonPressed(MouseButton.MOUSE_LEFT_BUTTON))
 				{
 					//world.InsertCube(pos, "brick");
-					rayCastedChunks = world.GetRayCastedChunks(camRay, cam);
+					rayCastedChunks = world.GetRayCastedChunks(world.cam.ray);
 					savedDrawFlag = world.drawFlag;
 
 				}
@@ -381,7 +401,7 @@ namespace VoxelEditor
 				cam.EndMode3D();
 				rl.DrawFPS(rl.GetScreenWidth() - 100, 10);
 				//rl.DrawText(string.Format("iter={0}", world.iterations), 10, 500, 22, Color.RED);
-				world.DrawInfo(world, camRay);
+				world.DrawInfo(world);
 
 
 				rl.EndDrawing();
@@ -407,8 +427,8 @@ namespace VoxelEditor
 				//if (chunkData != null && chunkData.drawFlag == savedDrawFlag && chunkData.cubeCount > 0)
 				{
 					//rl.DrawCube(p, chunkSize, chunkSize, chunkSize, c);
-					rl.DrawCubeWires(p, chunkSize, chunkSize, chunkSize, Color.WHITE);
-					R.DrawText3D(rl.GetFontDefault(), "*" + chunk.ToString(), p - mid, 18, 1, 2, true, Color.GREEN);
+					//rl.DrawCubeWires(p, chunkSize, chunkSize, chunkSize, Color.WHITE);
+					//R.DrawText3D(rl.GetFontDefault(), "*" + chunk.ToString(), p - mid, 18, 1, 2, true, Color.GREEN);
 				}
 				//RaylibExt.DrawPlane(vs[0], vs[1], vs[2], vs[3], c);
 				//RaylibExt.DrawPlane(vs[0], vs[1], vs[2], vs[3], c);
@@ -428,6 +448,45 @@ namespace VoxelEditor
 			foreach (var v in vs)
 			{
 				Console.WriteLine("pos={0} i={1}", v, world.toChunkIndex(v));
+			}
+		}
+
+		public static void FillChunk(VoxelWorld world, string tileName, Vector3 chunkPos)
+		{
+			foreach (var p in world.IterateChunk(world.chunkSize, chunkPos))
+			{
+				world.InsertCube(p, tileName);
+				//Voxel.DrawCubeWires(p, Color.RED);
+			}
+		}
+		public static void InsertCorners(VoxelWorld world, string tileName, Vector3 chunkPos)
+		{
+			var chunkSize = world.chunkSize;
+			var root = chunkSize * chunkPos;
+			var end = root + Vector3.One * chunkSize;
+
+			// welp, the chunks do indeed overlap
+			for (var n = 0; n < chunkSize; n++)
+			{
+				//world.InsertCube(root, tileName);
+				//world.InsertCube(end, tileName);
+				world.InsertCube(root + new Vector3(n, 0, 0), tileName);
+				world.InsertCube(root + new Vector3(0, 0, n), tileName);
+				world.InsertCube(root + new Vector3(n, chunkSize, 0), tileName);
+				world.InsertCube(root + new Vector3(0, chunkSize, n), tileName);
+				world.InsertCube(end - new Vector3(n, 0, 0), tileName);
+				//world.InsertCube(end - new Vector3(0, n, 0), tileName);
+				world.InsertCube(end - new Vector3(0, 0, n), tileName);
+				world.InsertCube(end - new Vector3(n, chunkSize, 0), tileName);
+				world.InsertCube(end - new Vector3(0, chunkSize, n), tileName);
+
+				world.InsertCube(root + new Vector3(0, n, 0), tileName);
+				world.InsertCube(root + new Vector3(chunkSize, n, 0), tileName);
+				world.InsertCube(root + new Vector3(chunkSize, n, chunkSize), tileName);
+				world.InsertCube(root + new Vector3(0, n, chunkSize), tileName);
+				//world.InsertCube(root + new Vector3(0, n, -chunkSize), tileName);
+				//world.InsertCube(end + new Vector3(0, n, 0), tileName);
+				world.InsertCube(root + new Vector3(n, n, n), tileName);
 			}
 		}
 	}
