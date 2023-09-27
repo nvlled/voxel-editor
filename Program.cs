@@ -29,7 +29,7 @@ namespace VoxelEditor
 
         public Player()
         {
-            OnPrimaryAction += InsertCube;
+            OnPrimaryAction = InsertCube;
         }
 
         public void Equip(string tileName)
@@ -43,10 +43,7 @@ namespace VoxelEditor
 
         public void TriggerPrimaryAction()
         {
-            if (OnPrimaryAction != null)
-            {
-                OnPrimaryAction(frontCube, state.cam.ray);
-            }
+            InsertCube(frontCube, state.cam.ray);
         }
 
         public void InsertCube(Vector3 frontCube, Ray ray)

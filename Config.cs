@@ -20,8 +20,8 @@ namespace VoxelEditor
 		public static int chunkSize = 20;
 		public static float fov = 65;
 		public static int fps = 60;
-		public static int windowWidth = 1000;
-		public static int windowHeight = 800;
+		public static int windowWidth = 800;
+		public static int windowHeight = 640;
 		public static float cameraHeight = 1.5f;
 		public static float runSpeed = 5.0f;
 		public static float walkSpeed = 1.5f;
